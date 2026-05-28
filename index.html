@@ -2,19 +2,36 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <script>
+        function startStream() {
+            fetch("http://localhost:5000/start", { method: "POST" })
+                .then(r => r.text())
+                .then(alert);
+        }
+
+        function stopStream() {
+            fetch("http://localhost:5000/stop", { method: "POST" })
+                .then(r => r.text())
+                .then(alert);
+        }
+    </script>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
+    <h2>Muse EEG Controller</h2>
+
+    <button onclick="startStream()">Start muselsl stream</button>
+    <button onclick="stopStream()">Stop muselsl stream</button>
+
+    <hr>
+
     <h2>Muse EEG Live Viewer</h2>
     <div id="plot" style="width:100%;height:600px;"></div>
 
     <script>
-        const ws = new WebSocket("ws://localhost:8765");
-
         let x = [];
-        let y = [[], [], [], []]; // Muse EEG 4ch
+        let y = [[], [], [], []];
 
-        // 初期プロット
         Plotly.newPlot('plot', [
             { y: y[0], mode: 'lines', name: 'TP9' },
             { y: y[1], mode: 'lines', name: 'AF7' },
@@ -22,21 +39,36 @@
             { y: y[3], mode: 'lines', name: 'TP10' }
         ]);
 
-        ws.onmessage = (event) => {
-            const sample = JSON.parse(event.data);
+        let ws;
 
-            x.push(Date.now());
-            for (let i = 0; i < 4; i++) {
-                y[i].push(sample[i]);
-            }
+        function connectWS() {
+            ws = new WebSocket("ws://localhost:8765");
 
-            Plotly.update('plot', [
-                { y: y[0] },
-                { y: y[1] },
-                { y: y[2] },
-                { y: y[3] }
-            ]);
-        };
+            ws.onopen = () => console.log("WebSocket connected");
+
+            ws.onclose = () => {
+                console.log("WebSocket closed, retrying...");
+                setTimeout(connectWS, 1000);
+            };
+
+            ws.onmessage = (event) => {
+                const sample = JSON.parse(event.data);
+
+                x.push(Date.now());
+                for (let i = 0; i < 4; i++) {
+                    y[i].push(sample[i]);
+                }
+
+                Plotly.update('plot', [
+                    { y: y[0] },
+                    { y: y[1] },
+                    { y: y[2] },
+                    { y: y[3] }
+                ]);
+            };
+        }
+
+        connectWS();
     </script>
 </body>
 </html>
