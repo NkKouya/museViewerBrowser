@@ -4,8 +4,8 @@ from pylsl import StreamInlet, resolve_streams
 import json
 
 async def stream_to_websocket(websocket):
-    # EEG ストリームを探す
-    streams = resolve_streams(prop='type', value='EEG')
+    # EEG ストリームを探す（古い pylsl 仕様）
+    streams = resolve_streams('type', 'EEG')
     inlet = StreamInlet(streams[0])
 
     while True:
