@@ -1,0 +1,18 @@
+services:
+  api:
+    build: .
+    container_name: muselsl_api
+    ports:
+      - "5000:5000"
+    command: python server.py
+    volumes:
+      - .:/app
+
+  websocket:
+    build: .
+    container_name: muselsl_ws
+    ports:
+      - "8765:8765"
+    command: python main.py
+    volumes:
+      - .:/app
