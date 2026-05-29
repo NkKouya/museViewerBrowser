@@ -1,74 +1,61 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <script>
-        function startStream() {
-            fetch("http://localhost:5000/start", { method: "POST" })
-                .then(r => r.text())
-                .then(alert);
-        }
-
-        function stopStream() {
-            fetch("http://localhost:5000/stop", { method: "POST" })
-                .then(r => r.text())
-                .then(alert);
-        }
-    </script>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <meta charset="UTF-8">
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
-    <h2>Muse EEG Controller</h2>
+  <h2>Muse EEG Real-time Plot (4ch)</h2>
+  <div id="plot" style="width:100%;height:900px;"></div>
 
-    <button onclick="startStream()">Start muselsl stream</button>
-    <button onclick="stopStream()">Stop muselsl stream</button>
+  <script>
+    const ws = new WebSocket("ws://localhost:8765");
 
-    <hr>
+    // 4ch の名前
+    const channels = ["TP9", "AF7", "AF8", "TP10"];
 
-    <h2>Muse EEG Live Viewer</h2>
-    <div id="plot" style="width:100%;height:600px;"></div>
+    // 4つのトレース（サブプロット用）
+    const traces = channels.map((ch, i) => ({
+      x: [],
+      y: [],
+      mode: "lines",
+      name: ch,
+      xaxis: "x" + (i + 1),
+      yaxis: "y" + (i + 1)
+    }));
 
-    <script>
-        let x = [];
-        let y = [[], [], [], []];
+    // サブプロットレイアウト
+    const layout = {
+      grid: { rows: 4, columns: 1, pattern: "independent" },
+      height: 900,
+      title: "Muse EEG 4ch Real-time",
+      margin: { l: 50, r: 20, t: 50, b: 20 }
+    };
 
-        Plotly.newPlot('plot', [
-            { y: y[0], mode: 'lines', name: 'TP9' },
-            { y: y[1], mode: 'lines', name: 'AF7' },
-            { y: y[2], mode: 'lines', name: 'AF8' },
-            { y: y[3], mode: 'lines', name: 'TP10' }
-        ]);
+    Plotly.newPlot("plot", traces, layout);
 
-        let ws;
+    let sampleIndex = 0;
 
-        function connectWS() {
-            ws = new WebSocket("ws://localhost:8765");
+    ws.onmessage = (event) => {
+      const sample = JSON.parse(event.data); // [ch1, ch2, ch3, ch4]
 
-            ws.onopen = () => console.log("WebSocket connected");
+      sample.forEach((value, i) => {
+        traces[i].x.push(sampleIndex);
+        traces[i].y.push(value);
+      });
 
-            ws.onclose = () => {
-                console.log("WebSocket closed, retrying...");
-                setTimeout(connectWS, 1000);
-            };
+      sampleIndex++;
 
-            ws.onmessage = (event) => {
-                const sample = JSON.parse(event.data);
-
-                x.push(Date.now());
-                for (let i = 0; i < 4; i++) {
-                    y[i].push(sample[i]);
-                }
-
-                Plotly.update('plot', [
-                    { y: y[0] },
-                    { y: y[1] },
-                    { y: y[2] },
-                    { y: y[3] }
-                ]);
-            };
+      // 古いデータを削除（1000点だけ保持）
+      traces.forEach(t => {
+        if (t.x.length > 1000) {
+          t.x.shift();
+          t.y.shift();
         }
+      });
 
-        connectWS();
-    </script>
+      Plotly.update("plot", traces);
+    };
+  </script>
 </body>
 </html>
